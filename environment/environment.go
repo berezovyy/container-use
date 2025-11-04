@@ -296,6 +296,42 @@ func (env *Environment) Run(ctx context.Context, command, shell string, useEntry
 	return combinedOutput, nil
 }
 
+// RunWithExitCode executes a command in the environment and returns stdout, stderr, exit code, and error.
+func (env *Environment) RunWithExitCode(ctx context.Context, command, shell string, useEntrypoint bool) (stdout string, stderr string, exitCode int, err error) {
+	args := []string{}
+	if command != "" {
+		args = []string{shell, "-c", command}
+	}
+	newState := env.container().WithExec(args, dagger.ContainerWithExecOpts{
+		UseEntrypoint:                 useEntrypoint,
+		Expect:                        dagger.ReturnTypeAny,
+		ExperimentalPrivilegedNesting: true,
+	})
+
+	exitCode, err = newState.ExitCode(ctx)
+	if err != nil {
+		return "", "", 0, fmt.Errorf("failed to get exit code: %w", err)
+	}
+
+	stdout, err = newState.Stdout(ctx)
+	if err != nil {
+		return "", "", exitCode, fmt.Errorf("failed to get stdout: %w", err)
+	}
+
+	stderr, err = newState.Stderr(ctx)
+	if err != nil {
+		return stdout, "", exitCode, fmt.Errorf("failed to get stderr: %w", err)
+	}
+
+	env.Notes.AddCommand(command, exitCode, stdout, stderr)
+
+	if err := env.apply(ctx, newState); err != nil {
+		return stdout, stderr, exitCode, fmt.Errorf("failed to apply container state: %w", err)
+	}
+
+	return stdout, stderr, exitCode, nil
+}
+
 func (env *Environment) RunBackground(ctx context.Context, command, shell string, ports []int, useEntrypoint bool) (EndpointMappings, error) {
 	args := []string{}
 	if command != "" {
