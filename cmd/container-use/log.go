@@ -41,12 +41,14 @@ container-use log`,
 		}
 
 		patch, _ := app.Flags().GetBool("patch")
+		jsonOutput, _ := app.Flags().GetBool("json")
 
-		return repo.Log(ctx, envID, patch, os.Stdout)
+		return repo.Log(ctx, envID, patch, jsonOutput, os.Stdout)
 	},
 }
 
 func init() {
 	logCmd.Flags().BoolP("patch", "p", false, "Generate patch")
+	logCmd.Flags().Bool("json", false, "Output result as JSON")
 	rootCmd.AddCommand(logCmd)
 }
